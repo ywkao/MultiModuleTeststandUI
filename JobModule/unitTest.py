@@ -1,28 +1,15 @@
 import sys
+import yaml
 from switch_control import Switch  # Replace with your actual module name
 
 def test_power_switch():
-    # Basic command templates
-    cmd_templates = {
-        'init': '*RST', # Reset command (modify based on your switch)
-        'on': 'A',      # 'RELAY ON'
-        'off': 'a',     # 'RELAY OFF'
-        'stop': 'ABORT' # Stop command
-    }
 
-    # Basic configuration
-    arg_configs = {
-        'duration': 2.0,     # 2 seconds duration
-        'operation': 'on'    # Default operation
-    }
+    with open('data_switch.yaml', 'r') as yaml_file:
+        config_data = yaml.safe_load(yaml_file)
 
-    # RS232 setup parameters
-    arg_setups = {
-        'baud_rate': 9600,
-        'data_bits': 8,
-        'parity': 'none',
-        'stop_bits': 1
-    }
+    cmd_templates = config_data['cmd_templates']
+    arg_configs = config_data['arg_configs']
+    arg_setups = config_data['arg_setups']
 
     # Create Switch instance
     job = Switch(
@@ -30,8 +17,6 @@ def test_power_switch():
         userNAME='',              # Not used for RS232
         privateKEYfile='',        # Not used for RS232
         timeOUT=1.0,
-        stdOUT=sys.stdout,
-        stdERR=sys.stderr,
         cmdTEMPLATEs=cmd_templates,
         argCONFIGs=arg_configs,
         argSETUPs=arg_setups

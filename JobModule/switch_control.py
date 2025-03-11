@@ -1,30 +1,26 @@
 import jobfrag_base
 import pyvisa
 import time
-from typing import TextIO, Dict, Any
+import logging
+from typing import Dict, Any
 
 class Switch(jobfrag_base.JobFragBase):
-    def __init__(self, hostNAME: str, userNAME: str, privateKEYfile: str, timeOUT: float,
-                 stdOUT: TextIO, stdERR: TextIO,
+    def __init__(self, hostNAME: str, timeOUT: float,
                  cmdTEMPLATEs: Dict[str, str], argCONFIGs: Dict[str, Any], argSETUPs: Dict[str, Any]):
         """
         Initialize the power switch control job.
         
         Args:
             hostNAME: RS232 port name (e.g., '/dev/ttyUSB0')
-            userNAME: Not used for RS232 but kept for template consistency
-            privateKEYfile: Not used for RS232 but kept for template consistency
             timeOUT: Communication timeout in seconds
-            stdOUT: Standard output stream
-            stdERR: Standard error stream
             cmdTEMPLATEs: Command templates for the switch
             argCONFIGs: Configuration parameters
             argSETUPs: Initial setup parameters
         """
+        self.logger = logging.getLogger(__name__)
+
         self.port = hostNAME
         self.timeout = timeOUT
-        self.stdout = stdOUT
-        self.stderr = stdERR
         self.cmd_templates = cmdTEMPLATEs
         self.configs = argCONFIGs
         self.setups = argSETUPs
@@ -80,11 +76,11 @@ class Switch(jobfrag_base.JobFragBase):
                 self.device.write(init_cmd)
             
             self.is_initialized = True
-            self.stdout.write("Power switch initialized successfully\n")
+            self.logger.info("Power switch initialized successfully")
             return True
             
         except Exception as e:
-            self.stderr.write(f"Initialization failed: {str(e)}\n")
+            self.logger.error(f"Initialization failed: {str(e)}")
             return False
 
     def Configure(self, updatedCONF: Dict[str, Any]) -> bool:
@@ -95,59 +91,34 @@ class Switch(jobfrag_base.JobFragBase):
             updatedCONF: Dictionary containing updated parameters
         """
         try:
-            # Update configurations
             self.configs.update(updatedCONF)
-            
-            # Apply any necessary configuration changes to the device
-            if self.is_initialized and self.device:
-                # Example: Update device timing parameters
-                if 'cycle_duration' in updatedCONF:
-                    # Apply new timing if needed
-                    pass
-                    
-            self.stdout.write("Configuration updated successfully\n")
+            self.logger.info("Configuration updated successfully")
             return True
             
         except Exception as e:
-            self.stderr.write(f"Configuration update failed: {str(e)}\n")
+            self.logger.error(f"Configuration update failed: {str(e)}")
             return False
 
     def Run(self):
         """Execute the power switching operation"""
         if not self.is_initialized:
-            self.stderr.write("Device not initialized\n")
+            self.logger.error("Device not initialized")
             return False
             
         try:
             self.is_running = True
-            
-            # Get operation parameters from configs
-            duration = self.configs.get('duration', 1.0)
-            operation = self.configs.get('operation', 'on')  # 'on' or 'off'
-            
-            # Get command template
+            operation = self.configs.get('operation', 'on')
             cmd = self.cmd_templates.get(operation)
             if not cmd:
                 raise ValueError(f"No command template for operation: {operation}")
             
-            # Execute command
             self.device.write(cmd)
-            self.stdout.write(f"Power status: {operation}\n")
+            self.logger.info(f"Power status: {operation}")
             
-            ### # Wait for specified duration
-            ### time.sleep(duration)
-            ### 
-            ### # Execute opposite command if needed
-            ### opposite_cmd = self.cmd_templates.get('off' if operation == 'on' else 'on')
-            ### if opposite_cmd:
-            ###     self.device.write(opposite_cmd)
-            ### 
-            ### self.stdout.write(f"Power {operation} cycle completed\n")
-            ### self.is_running = False
             return True
             
         except Exception as e:
-            self.stderr.write(f"Run operation failed: {str(e)}\n")
+            self.logger.error(f"Run operation failed: {str(e)}")
             self.is_running = False
             return False
 
@@ -161,9 +132,34 @@ class Switch(jobfrag_base.JobFragBase):
                     self.device.write(stop_cmd)
                 
                 self.is_running = False
-                self.stdout.write("Operation stopped\n")
+                self.logger.info("Operation stopped")
                 return True
                 
             except Exception as e:
-                self.stderr.write(f"Stop operation failed: {str(e)}\n")
+                self.logger.error(f"Stop operation failed: {str(e)}")
                 return False
+
+if __name__ == "__main__":
+    import sys, yaml
+    with open('data_switch.yaml', 'r') as yaml_file:
+        config_data = yaml.safe_load(yaml_file)
+
+    # Create Switch instance
+    job = Switch(
+        hostNAME     = '/dev/ttyUSB0',  # Change to your port
+        timeOUT      = 1.0,
+        cmdTEMPLATEs = config_data['cmd_templates'],
+        argCONFIGs   = config_data['arg_configs'],
+        argSETUPs    = config_data['arg_setups']
+    )
+
+    # Test sequence
+    print("Initializing...")
+    if job.Initialize():
+        print("Initialization successful")
+        new_config = {'duration': 3.0}
+        job.Configure(new_config)
+        job.Run()
+        job.Stop()
+    else:
+        print("Initialization failed")
