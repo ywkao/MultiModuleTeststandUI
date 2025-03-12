@@ -1,9 +1,11 @@
+import os, sys
 import asyncio
-from PythonTools.MyLogging_BashJob1 import log as rs232log
-from PythonTools.MyLogging_BashJob1 import log as bashlog
-
 import pyvisa
 import serial
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from PythonTools.MyLogging_BashJob1 import log as rs232log
+from PythonTools.MyLogging_BashJob1 import log as bashlog
 
 class RS232Dev:
     def __init__(self, tag):
